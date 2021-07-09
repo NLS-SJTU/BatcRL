@@ -5,7 +5,7 @@ import numpy as np
 import torch.nn as nn
 import torch
 from torch.optim import Adam
-import gym
+
 
 class ReplayBuffer:
     def __init__(self, obs_dim: int,batch_size:128,  memory_size: int = 2 * 10) -> None:
@@ -44,7 +44,6 @@ class QNet(nn.Module):
 
     def forward(self, state: torch.FloatTensor) -> torch.FloatTensor:
         return self.encoder(state)
-
 
 
 class DeepQnetwork:
@@ -106,10 +105,6 @@ class DeepQnetwork:
             self.soft_update()
 
 
-
-
-
-
 def demo_test():
     def test_agent(env, agent, times=100):
         res = []
@@ -124,12 +119,6 @@ def demo_test():
                     res.append(r)
                     break
         return np.array(res).mean()
-
-
-
-
-
-
 
     import gym
     from copy import  deepcopy
@@ -148,13 +137,3 @@ def demo_test():
 
 if __name__ == '__main__':
     demo_test()
-
-
-
-
-
-
-
-
-
-
