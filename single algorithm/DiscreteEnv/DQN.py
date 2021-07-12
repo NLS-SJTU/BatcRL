@@ -146,7 +146,7 @@ class DeepQnetwork:
                 obs = env.reset()
             else:
                 obs = s_
-        return res.mean()
+        return res.mean(), res.std()
 
 
 
