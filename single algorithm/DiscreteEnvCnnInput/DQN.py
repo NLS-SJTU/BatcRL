@@ -37,20 +37,29 @@ class ReplayBuffer:
 
 
 class QNet(nn.Module):
-    def __init__(self, obs_dim: int, action_dim: int, mid_dim: int = 256) -> None:
+    def __init__(self, img_dim: int, action_dim: int, mid_dim: int = 256) -> None:
         '''
-        :param obs_dim:  the dim of observation. type: int. for gym env: obs_dim = env.observation_space.shape[0]
-        :param action_dim: action space, i.e: The number of actions that can be taken at each step. type:int. for gym env: action_dim = env.action_space.n
-        :param mid_dim: hidden size of MLP.
+        :param img_dim: (size, size, channel). e.g: 28 * 28 * 3
+        :param action_dim: the number of actions.
+        :param mid_dim: mlp dim.
         '''
         super(QNet, self).__init__()
-        self.obs_dim = obs_dim
+        size, _, channel = img_dim
         self.action_dim = action_dim
-        self.encoder = nn.Sequential(
-            nn.Linear(obs_dim, mid_dim), nn.ReLU(),
-            nn.Linear(mid_dim, mid_dim), nn.ReLU(),
+        cnn = nn.Sequential(
+            nn.Conv2d(channel, 32, kernel_size=8, stride=4), nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2), nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1), nn.ReLU(),
+            nn.Flatten(),
+        )
+        with torch.no_grad():
+            tmp = torch.rand((1, channel, size, size))
+            tmp_dim = cnn(tmp).shape[1]
+        mlp = nn.Sequential(
+            nn.Linear(tmp_dim, mid_dim), nn.ReLU(),
             nn.Linear(mid_dim, action_dim)
         )
+        self.encoder = nn.Sequential(cnn, mlp)
 
     def forward(self, state: torch.FloatTensor) -> torch.FloatTensor:
         # return Q(s, a). the estimated state-action value.
@@ -78,7 +87,7 @@ class DeepQnetwork:
         for exploring in the env, each time will collect self.target_step * self.batch_size number of samples into buffer,
         for updating neural network, each time will update self.target_step * self.repeat_time times. 
         '''
-        self.target_step = 1024
+        self.target_step = 2048
         self.repeat_time = 1
         self.reward_scale = 1.
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -130,7 +139,7 @@ class DeepQnetwork:
             self.soft_update(self.QNet, self.QNet_target, self.tau)
 
     def evaluate(self, env, render=False):
-        epochs = 50
+        epochs = 20
         res = np.zeros((epochs,))
         obs = env.reset()
         index = 0
@@ -162,10 +171,10 @@ def demo_test():
     agent = DeepQnetwork(obs_dim, action_dim)
     # using random explore to collect samples.
     agent.explore_env(deepcopy(env), all_greedy=True)
-    total_step = 100000
+    total_step = 300000
     eval_env = deepcopy(env)
     step = 0
-    target_return = 200
+    target_return = 250
     avg_return = 0
     t = time.time()
     step_record = []
@@ -179,7 +188,7 @@ def demo_test():
         episode_return_mean.append(avg_return)
         episode_return_std.append(std_return)
         step_record.append(step)
-    # agent.QNet.load_and_save_weight(f'LunarLanderDQN.weight', mode='save')
+    agent.QNet.load_and_save_weight(f'LunarLanderDQN.weight', mode='save')
     t = time.time() - t
     print('total cost time:', t, 's')
     from utils import plot_learning_curve
