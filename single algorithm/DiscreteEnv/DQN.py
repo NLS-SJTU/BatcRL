@@ -37,7 +37,7 @@ class ReplayBuffer:
 
 
 class QNet(nn.Module):
-    def __init__(self, obs_dim: int, action_dim: int, mid_dim: int = 128) -> None:
+    def __init__(self, obs_dim: int, action_dim: int, mid_dim: int = 256) -> None:
         '''
         :param obs_dim:  the dim of observation. type: int. for gym env: obs_dim = env.observation_space.shape[0]
         :param action_dim: action space, i.e: The number of actions that can be taken at each step. type:int. for gym env: action_dim = env.action_space.n
@@ -71,8 +71,8 @@ class DeepQnetwork:
         self.learning_tate = 1e-4
         self.tau = 2 ** -8  # soft update.
         self.gamma = 0.99  # discount factor.
-        self.batch_size = 1024
-        self.memory_size = 100000
+        self.batch_size = 2048
+        self.memory_size = 200000
         self.explore_rate = 0.2  # epsilon greedy rate.
         '''
         for exploring in the env, each time will collect self.target_step * self.batch_size number of samples into buffer,
@@ -129,12 +129,13 @@ class DeepQnetwork:
             self.optimizer.step()
             self.soft_update(self.QNet, self.QNet_target, self.tau)
 
-    def evaluate(self, env):
+    def evaluate(self, env, render=False):
         epochs = 50
         res = np.zeros((epochs,))
         obs = env.reset()
         index = 0
         while index < epochs:
+            if render: env.render()
             obs = torch.as_tensor((obs,), dtype=torch.float32, device=self.device).detach_()
             dist = self.QNet(obs)[0]
             action = dist.argmax(dim=0).cpu().numpy()
@@ -148,16 +149,13 @@ class DeepQnetwork:
         return res.mean()
 
 
-def render_test():
-    pass
-
 
 def demo_test():
     import time
     import gym
     from copy import deepcopy
     torch.manual_seed(0)
-    env_id = 'CartPole-v0'
+    env_id = 'LunarLander-v2' # 'CartPole-v0'
     env = gym.make(env_id)
     obs_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
@@ -175,9 +173,10 @@ def demo_test():
         agent.update()
         mr = agent.evaluate(eval_env)
         print(f'current step:{step}, reward:{mr}')
-    agent.QNet.load_and_save_weight(f'DQN.weight', mode='save')
+    agent.QNet.load_and_save_weight(f'LunarLanderDQN.weight', mode='save')
     t = time.time() - t
     print('total cost time:',t,'s')
+    agent.evaluate(eval_env, render=True)
 
 
 if __name__ == '__main__':
