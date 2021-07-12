@@ -166,17 +166,25 @@ def demo_test():
     eval_env = deepcopy(env)
     step = 0
     target_return = 200
-    mr = 0
+    avg_return = 0
     t = time.time()
-    while step < total_step and  mr < target_return-1:
+    step_record = []
+    episode_return_mean = []
+    episode_return_std = []
+    while step < total_step and avg_return < target_return - 1:
         step += agent.explore_env(env)
         agent.update()
-        mr = agent.evaluate(eval_env)
-        print(f'current step:{step}, reward:{mr}')
-    agent.QNet.load_and_save_weight(f'LunarLanderDQN.weight', mode='save')
+        avg_return, std_return = agent.evaluate(eval_env)
+        print(f'current step:{step}, reward:{avg_return}')
+        episode_return_mean.append(avg_return)
+        episode_return_std.append(std_return)
+        step_record.append(step)
+    # agent.QNet.load_and_save_weight(f'LunarLanderDQN.weight', mode='save')
     t = time.time() - t
-    print('total cost time:',t,'s')
-    agent.evaluate(eval_env, render=True)
+    print('total cost time:', t, 's')
+    from utils import plot_learning_curve
+    plot_learning_curve(step_record, episode_return_mean, episode_return_std)
+    # agent.evaluate(eval_env, render=True)
 
 
 if __name__ == '__main__':
