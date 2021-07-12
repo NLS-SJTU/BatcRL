@@ -123,3 +123,5 @@ def make_env(env_name):
 if __name__ == '__main__':
     env_id = 'Breakout-v0'
     env = make_env(env_id)
+    obs = env.reset()
+    print(obs.shape)

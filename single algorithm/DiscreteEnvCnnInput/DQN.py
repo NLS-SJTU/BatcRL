@@ -10,9 +10,9 @@ import os
 
 
 class ReplayBuffer:
-    def __init__(self, state_dim, max_size=10000, device=torch.device('cpu')):
+    def __init__(self, state_dim:list, max_size=10000, device=torch.device('cpu')):
         self.device = device
-        self.state_buffer = torch.empty((max_size, state_dim), dtype=torch.float32, device=device)
+        self.state_buffer = torch.empty((max_size, *state_dim), dtype=torch.float32, device=device)
         self.other_buffer = torch.empty((max_size, 3), dtype=torch.float32, device=device)
         self.index = 0
         self.max_size = max_size
@@ -37,14 +37,14 @@ class ReplayBuffer:
 
 
 class QNet(nn.Module):
-    def __init__(self, img_dim: int, action_dim: int, mid_dim: int = 256) -> None:
+    def __init__(self, img_dim: list, action_dim: int, mid_dim: int = 256) -> None:
         '''
         :param img_dim: (size, size, channel). e.g: 28 * 28 * 3
         :param action_dim: the number of actions.
         :param mid_dim: mlp dim.
         '''
         super(QNet, self).__init__()
-        size, _, channel = img_dim
+        channel, size, _ = img_dim
         self.action_dim = action_dim
         cnn = nn.Sequential(
             nn.Conv2d(channel, 32, kernel_size=8, stride=4), nn.ReLU(),
@@ -74,14 +74,14 @@ class QNet(nn.Module):
 
 
 class DeepQnetwork:
-    def __init__(self, obs_dim: int, action_dim: int):
+    def __init__(self, obs_dim: list, action_dim: int):
         self.obs_dim = obs_dim
         self.action_dim = action_dim
         self.learning_tate = 1e-4
         self.tau = 2 ** -8  # soft update.
         self.gamma = 0.99  # discount factor.
-        self.batch_size = 2048
-        self.memory_size = 200000
+        self.batch_size = 1024
+        self.memory_size = 50000
         self.explore_rate = 0.2  # epsilon greedy rate.
         '''
         for exploring in the env, each time will collect self.target_step * self.batch_size number of samples into buffer,
@@ -161,25 +161,26 @@ class DeepQnetwork:
 
 def demo_test():
     import time
-    import gym
     from copy import deepcopy
+    from AtrariEnv import make_env
     torch.manual_seed(0)
-    env_id = 'LunarLander-v2' # 'CartPole-v0'
-    env = gym.make(env_id)
-    obs_dim = env.observation_space.shape[0]
+    env_id = 'Breakout-v0' # 'CartPole-v0'
+    env = make_env(env_id)
+    obs_dim = env.observation_space.shape
     action_dim = env.action_space.n
     agent = DeepQnetwork(obs_dim, action_dim)
     # using random explore to collect samples.
     agent.explore_env(deepcopy(env), all_greedy=True)
-    total_step = 300000
+    total_step = 10000000
     eval_env = deepcopy(env)
     step = 0
-    target_return = 250
+    target_return = 100000
     avg_return = 0
     t = time.time()
     step_record = []
     episode_return_mean = []
     episode_return_std = []
+    from utils import plot_learning_curve
     while step < total_step and avg_return < target_return - 1:
         step += agent.explore_env(env)
         agent.update()
@@ -188,11 +189,14 @@ def demo_test():
         episode_return_mean.append(avg_return)
         episode_return_std.append(std_return)
         step_record.append(step)
-    agent.QNet.load_and_save_weight(f'LunarLanderDQN.weight', mode='save')
+        plot_learning_curve(step_record, episode_return_mean, episode_return_std, 'breakOut_plot_learning_curve.jpg')
+        if step % 100000 == 0:
+            agent.QNet.load_and_save_weight(f'BreakoutDQN.weight', mode='save')
+
+    agent.QNet.load_and_save_weight(f'BreakoutDQN.weight', mode='save')
     t = time.time() - t
     print('total cost time:', t, 's')
-    from utils import plot_learning_curve
-    plot_learning_curve(step_record, episode_return_mean, episode_return_std)
+    plot_learning_curve(step_record, episode_return_mean, episode_return_std,'breakOut_plot_learning_curve.jpg')
     # agent.evaluate(eval_env, render=True)
 
 
