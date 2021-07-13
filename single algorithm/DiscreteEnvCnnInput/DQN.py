@@ -88,7 +88,7 @@ class DeepQnetwork:
         for updating neural network, each time will update self.target_step * self.repeat_time times. 
         '''
         self.target_step = 2048
-        self.repeat_time = 1
+        self.repeat_time = 10
         self.reward_scale = 1.
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.buffer = ReplayBuffer(obs_dim, self.memory_size, self.device)
@@ -180,6 +180,7 @@ def demo_test():
     step_record = []
     episode_return_mean = []
     episode_return_std = []
+    init_save = 100000
     from utils import plot_learning_curve
     while step < total_step and avg_return < target_return - 1:
         step += agent.explore_env(env)
@@ -190,8 +191,9 @@ def demo_test():
         episode_return_std.append(std_return)
         step_record.append(step)
         plot_learning_curve(step_record, episode_return_mean, episode_return_std, 'breakOut_plot_learning_curve.jpg')
-        if step % 100000 == 0:
+        if step > init_save:
             agent.QNet.load_and_save_weight(f'BreakoutDQN.weight', mode='save')
+            init_save += init_save
 
     agent.QNet.load_and_save_weight(f'BreakoutDQN.weight', mode='save')
     t = time.time() - t
