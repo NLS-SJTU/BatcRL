@@ -3,6 +3,8 @@ import numpy as np
 
 
 def plot_learning_curve(steps, avg_return, std_return, name='plot_learning_curve.jpg'):
+    plt.clf()
+    plt.figure()
     steps = np.array(steps)
     avg_return = np.array(avg_return)
     std_return = np.array(std_return)
