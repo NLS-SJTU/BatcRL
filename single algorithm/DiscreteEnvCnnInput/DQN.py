@@ -37,7 +37,7 @@ class ReplayBuffer:
 
 
 class QNet(nn.Module):
-    def __init__(self, img_dim: list, action_dim: int, mid_dim: int = 256) -> None:
+    def __init__(self, img_dim: list, action_dim: int, mid_dim: int = 512) -> None:
         '''
         :param img_dim: (size, size, channel). e.g: 28 * 28 * 3
         :param action_dim: the number of actions.
@@ -186,7 +186,7 @@ def demo_test():
         step += agent.explore_env(env)
         agent.update()
         avg_return, std_return = agent.evaluate(eval_env)
-        print(f'current step:{step}, reward:{avg_return}')
+        print(f'current step:{step}, episode return:{avg_return}')
         episode_return_mean.append(avg_return)
         episode_return_std.append(std_return)
         step_record.append(step)
