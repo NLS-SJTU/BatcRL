@@ -12,3 +12,4 @@ def plot_learning_curve(steps, avg_return, std_return, name='plot_learning_curve
     plt.fill_between(steps, avg_return-std_return, avg_return + std_return, alpha=0.3)
     plt.legend()
     plt.savefig(name)
+    plt.close()
