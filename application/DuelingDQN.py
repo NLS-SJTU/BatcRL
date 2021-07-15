@@ -36,25 +36,33 @@ class ReplayBuffer:
         )
 
 
-class QNet(nn.Module):
+class DuelingQNet(nn.Module):
     def __init__(self, obs_dim: int, action_dim: int, mid_dim: int = 256) -> None:
         '''
         :param obs_dim:  the dim of observation. type: int. for gym env: obs_dim = env.observation_space.shape[0]
         :param action_dim: action space, i.e: The number of actions that can be taken at each step. type:int. for gym env: action_dim = env.action_space.n
         :param mid_dim: hidden size of MLP.
         '''
-        super(QNet, self).__init__()
+        super(DuelingQNet, self).__init__()
         self.obs_dim = obs_dim
         self.action_dim = action_dim
         self.encoder = nn.Sequential(
             nn.Linear(obs_dim, mid_dim), nn.ReLU(),
             nn.Linear(mid_dim, mid_dim), nn.ReLU(),
-            nn.Linear(mid_dim, action_dim)
         )
+        self.net_val = nn.Sequential(
+            nn.Linear(mid_dim, mid_dim), nn.ReLU(),
+            nn.Linear(mid_dim, 1))
+        self.net_adv = nn.Sequential(
+            nn.Linear(mid_dim, mid_dim), nn.ReLU(),
+            nn.Linear(mid_dim, action_dim))
 
     def forward(self, state: torch.FloatTensor) -> torch.FloatTensor:
         # return Q(s, a). the estimated state-action value.
-        return self.encoder(state)
+        state = self.encoder(state)
+        q_val = self.net_val(state)
+        q_adv = self.net_adv(state)
+        return q_val + q_adv - q_adv.mean(dim=1, keepdim=True)
 
     def load_and_save_weight(self, path, mode='load'):
         if mode == 'load':
@@ -64,14 +72,14 @@ class QNet(nn.Module):
             torch.save(self.state_dict(), path)
 
 
-class DeepQnetwork:
+class DeepDuelingQNetwork:
     def __init__(self, obs_dim: int, action_dim: int):
         self.obs_dim = obs_dim
         self.action_dim = action_dim
         self.learning_tate = 1e-4
         self.tau = 2 ** -8  # soft update.
         self.gamma = 0.99  # discount factor.
-        self.batch_size = 64
+        self.batch_size = 128
         self.memory_size = 100000
         self.explore_rate = 0.2  # epsilon greedy rate.
         '''
@@ -83,9 +91,9 @@ class DeepQnetwork:
         self.reward_scale = 1.
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.buffer = ReplayBuffer(obs_dim, self.memory_size, self.device)
-        self.QNet = QNet(obs_dim, action_dim).to(self.device)
-        self.QNet_target = QNet(obs_dim, action_dim).to(self.device)  # Q target.
-        self.optimizer = Adam(self.QNet.parameters(), self.learning_tate)
+        self.DuelingQNet = DuelingQNet(obs_dim, action_dim).to(self.device)
+        self.DuelingQNet_target = DuelingQNet(obs_dim, action_dim).to(self.device)  # Q target.
+        self.optimizer = Adam(self.DuelingQNet.parameters(), self.learning_tate)
         self.loss_func = nn.MSELoss(reduction='mean')
 
     def select_action(self, state: np.ndarray) -> int:
@@ -94,7 +102,7 @@ class DeepQnetwork:
             action = np.random.randint(self.action_dim)
         else:
             state = torch.as_tensor((state,), dtype=torch.float32, device=self.device).detach_()
-            dist = self.QNet(state)[0]
+            dist = self.DuelingQNet(state)[0]
             action = dist.argmax(dim=0).cpu().numpy()
         return action
 
@@ -120,14 +128,14 @@ class DeepQnetwork:
         for _ in range(self.target_step * self.repeat_time):
             state, action, reward, mask, state_ = self.buffer.sample_batch(self.batch_size)
             # Q(s_t, a_t) = r_t + \gamma * max Q(s_{t+1}, a)
-            next_q = self.QNet_target(state_).detach().max(1)[0]
+            next_q = self.DuelingQNet_target(state_).detach().max(1)[0]
             q_target = reward + mask * next_q
-            q_eval = self.QNet(state).gather(1, action)
+            q_eval = self.DuelingQNet(state).gather(1, action)
             loss = self.loss_func(q_eval, q_target.view(self.batch_size, 1))
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-            self.soft_update(self.QNet, self.QNet_target, self.tau)
+            self.soft_update(self.DuelingQNet, self.DuelingQNet_target, self.tau)
 
     def evaluate(self, env, render=False):
         epochs = 20
@@ -137,7 +145,7 @@ class DeepQnetwork:
         while index < epochs:
             if render: env.render()
             obs = torch.as_tensor((obs,), dtype=torch.float32, device=self.device).detach_()
-            dist = self.QNet(obs)[0]
+            dist = self.DuelingQNet(obs)[0]
             action = dist.argmax(dim=0).cpu().numpy()
             s_, reward, done, _ = env.step(int(action))
             res[index] += reward
@@ -147,10 +155,6 @@ class DeepQnetwork:
             else:
                 obs = s_
         return res.mean(), res.std()
-
-
-
-
 
 def demo_test():
     import time
@@ -166,7 +170,7 @@ def demo_test():
     env = gym.wrappers.FlattenObservation(env)
     obs_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
-    agent = DeepQnetwork(obs_dim, action_dim)
+    agent = DeepDuelingQNetwork(obs_dim, action_dim)
     # using random explore to collect samples.
     agent.explore_env(deepcopy(env), all_greedy=True)
     total_step = 1000000
@@ -189,14 +193,13 @@ def demo_test():
         step_record.append(step)
         plot_learning_curve(step_record, episode_return_mean, episode_return_std, 'highway_plot_learning_curve.jpg')
         if step > init_save:
-            agent.QNet.load_and_save_weight(f'BreakoutDQN.weight', mode='save')
+            agent.QNet.load_and_save_weight(f'HighwayDQN.weight', mode='save')
             init_save += init_save
     agent.QNet.load_and_save_weight(f'HighwayDQN.weight', mode='save')
     t = time.time() - t
     print('total cost time:', t, 's')
     plot_learning_curve(step_record, episode_return_mean, episode_return_std)
     agent.evaluate(eval_env, render=True)
-
 
 if __name__ == '__main__':
     demo_test()
