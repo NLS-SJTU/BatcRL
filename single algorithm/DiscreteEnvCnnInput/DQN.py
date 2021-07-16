@@ -1,10 +1,11 @@
 '''
 implemented by PyTorch.
 '''
+import gym
 import numpy as np
 import torch.nn as nn
 import torch
-from torch.optim import Adam
+from torch.optim import RMSprop
 from typing import Tuple
 import os
 
@@ -77,10 +78,10 @@ class DeepQnetwork:
     def __init__(self, obs_dim: list, action_dim: int):
         self.obs_dim = obs_dim
         self.action_dim = action_dim
-        self.learning_tate = 1e-4
+        self.learning_tate = 0.00025
         self.tau = 2 ** -8  # soft update.
         self.gamma = 0.99  # discount factor.
-        self.batch_size = 512
+        self.batch_size = 32
         self.memory_size = 50000
         self.explore_rate = 0.2  # epsilon greedy rate.
         '''
@@ -94,7 +95,7 @@ class DeepQnetwork:
         self.buffer = ReplayBuffer(obs_dim, self.memory_size, self.device)
         self.QNet = QNet(obs_dim, action_dim).to(self.device)
         self.QNet_target = QNet(obs_dim, action_dim).to(self.device)  # Q target.
-        self.optimizer = Adam(self.QNet.parameters(), self.learning_tate)
+        self.optimizer = RMSprop(self.QNet.parameters(), self.learning_tate,alpha=0.95, eps=0.01)
         self.loss_func = nn.MSELoss(reduction='mean')
 
     def select_action(self, state: np.ndarray) -> int:
@@ -158,6 +159,10 @@ class DeepQnetwork:
         return res.mean(), res.std()
 
 
+class RewardClip(gym.RewardWrapper):
+    def reward(self, reward):
+        return np.clip(reward, -1.0, 1.0)
+
 
 def demo_test():
     import time
@@ -166,6 +171,7 @@ def demo_test():
     torch.manual_seed(0)
     env_id = 'Breakout-v0' # 'CartPole-v0'
     env = make_env(env_id)
+    env = RewardClip(env)
     obs_dim = env.observation_space.shape
     action_dim = env.action_space.n
     agent = DeepQnetwork(obs_dim, action_dim)

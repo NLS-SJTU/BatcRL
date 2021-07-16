@@ -79,7 +79,7 @@ class DeepDuelingQNetwork:
         self.learning_tate = 1e-4
         self.tau = 2 ** -8  # soft update.
         self.gamma = 0.99  # discount factor.
-        self.batch_size = 128
+        self.batch_size = 256
         self.memory_size = 100000
         self.explore_rate = 0.2  # epsilon greedy rate.
         '''
@@ -165,11 +165,12 @@ def demo_test():
 
 
     torch.manual_seed(0)
-    env_id = 'merge-v0' # 'CartPole-v0'
+    env_id = 'roundabout-v0' # 'CartPole-v0'
     env = gym.make(env_id)
     env = gym.wrappers.FlattenObservation(env)
     obs_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
+    print(f'env name:{env_id}, obs dim:{obs_dim}, action dim:{action_dim}')
     agent = DeepDuelingQNetwork(obs_dim, action_dim)
     # using random explore to collect samples.
     agent.explore_env(deepcopy(env), all_greedy=True)
@@ -182,7 +183,7 @@ def demo_test():
     step_record = []
     episode_return_mean = []
     episode_return_std = []
-    init_save = 100000
+    init_save = 10000
     while step < total_step and avg_return < target_return - 1:
         step += agent.explore_env(env)
         agent.update()
@@ -193,9 +194,9 @@ def demo_test():
         step_record.append(step)
         plot_learning_curve(step_record, episode_return_mean, episode_return_std, 'highway_plot_learning_curve.jpg')
         if step > init_save:
-            agent.QNet.load_and_save_weight(f'HighwayDQN.weight', mode='save')
+            agent.DuelingQNet.load_and_save_weight(f'HighwayDQN.weight', mode='save')
             init_save += init_save
-    agent.QNet.load_and_save_weight(f'HighwayDQN.weight', mode='save')
+    agent.DuelingQNet.load_and_save_weight(f'HighwayDQN.weight', mode='save')
     t = time.time() - t
     print('total cost time:', t, 's')
     plot_learning_curve(step_record, episode_return_mean, episode_return_std)

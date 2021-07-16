@@ -71,7 +71,7 @@ class DeepQnetwork:
         self.learning_tate = 1e-4
         self.tau = 2 ** -8  # soft update.
         self.gamma = 0.99  # discount factor.
-        self.batch_size = 64
+        self.batch_size = 128
         self.memory_size = 100000
         self.explore_rate = 0.2  # epsilon greedy rate.
         '''
