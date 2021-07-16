@@ -172,13 +172,13 @@ def demo_test():
     total_step = 1000000
     eval_env = deepcopy(env)
     step = 0
-    target_return = 100000
+    target_return = 15
     avg_return = 0
     t = time.time()
     step_record = []
     episode_return_mean = []
     episode_return_std = []
-    init_save = 100000
+    init_save = 10000
     while step < total_step and avg_return < target_return - 1:
         step += agent.explore_env(env)
         agent.update()

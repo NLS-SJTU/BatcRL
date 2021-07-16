@@ -177,7 +177,7 @@ def demo_test():
     total_step = 1000000
     eval_env = deepcopy(env)
     step = 0
-    target_return = 100000
+    target_return = 10
     avg_return = 0
     t = time.time()
     step_record = []

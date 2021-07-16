@@ -13,27 +13,12 @@ def plot_learning_curve(steps, avg_return, std_return, name='plot_learning_curve
     plt.close()
 
 
-
-def test_on_highway_env():
-    import gym
-    import highway_env
-    from DuelingDQN import DeepDuelingQNetwork
-    from highway_car_dqn import DeepQnetwork
-    env = gym.make('merge-v0')
-    env = gym.wrappers.FlattenObservation(env)
-    obs_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.n
-    agent = DeepQnetwork(obs_dim, action_dim)
-    agent.QNet.load_and_save_weight('BreakoutDQN.weight', mode='load')
-    record_video(env, agent.QNet)
-
-
-def record_video(env, agent):
+def record_video(env_id, agent):
     import gym
     from gym.wrappers import Monitor
     import torch
     import highway_env
-    env = Monitor(env, './video', force=True)
+    env = Monitor(gym.make(env_id), './video', force=True)
     obs = env.reset()
     eps = 10
     index = 0
@@ -45,5 +30,4 @@ def record_video(env, agent):
     env.close()
 
 
-if __name__ == '__main__':
-    test_on_highway_env()
+
