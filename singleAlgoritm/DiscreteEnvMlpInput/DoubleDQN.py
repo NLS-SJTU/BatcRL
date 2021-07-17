@@ -37,7 +37,7 @@ class ReplayBuffer:
 
 
 class QNet(nn.Module):
-    def __init__(self, obs_dim: int, action_dim: int, mid_dim: int = 128) -> None:
+    def __init__(self, obs_dim: int, action_dim: int, mid_dim: int = 512) -> None:
         '''
         :param obs_dim:  the dim of observation. type: int. for gym env: obs_dim = env.observation_space.shape[0]
         :param action_dim: action space, i.e: The number of actions that can be taken at each step. type:int. for gym env: action_dim = env.action_space.n
@@ -64,30 +64,23 @@ class QNet(nn.Module):
         q2 = self.q2(state)
         return q1, q2
 
-    def load_and_save_weight(self, path, mode='load'):
-        if mode == 'load':
-            if os.path.exists(path):
-                self.load_state_dict(torch.load(path))
-        else:
-            torch.save(self.state_dict(), path)
 
-
-class DeepQnetwork:
+class DoubleDQNAgent:
     def __init__(self, obs_dim: int, action_dim: int):
         self.obs_dim = obs_dim
         self.action_dim = action_dim
         self.learning_tate = 1e-4
         self.tau = 2 ** -8  # soft update.
         self.gamma = 0.99  # discount factor.
-        self.batch_size = 1024
+        self.batch_size = 128
         self.memory_size = 100000
         self.explore_rate = 0.2  # epsilon greedy rate.
         '''
         for exploring in the env, each time will collect self.target_step * self.batch_size number of samples into buffer,
         for updating neural network, each time will update self.target_step * self.repeat_time times. 
         '''
-        self.target_step = 1024
-        self.repeat_time = 1
+        self.target_step = 2048
+        self.repeat_time = 128
         self.reward_scale = 1.
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.buffer = ReplayBuffer(obs_dim, self.memory_size, self.device)
@@ -125,7 +118,7 @@ class DeepQnetwork:
 
     def update(self) -> None:
         # update the neural network.
-        for _ in range(self.target_step * self.repeat_time):
+        for _ in range(int(self.target_step * self.repeat_time / self.batch_size)):
             state, action, reward, mask, state_ = self.buffer.sample_batch(self.batch_size)
             # Q(s_t, a_t) = r_t + \gamma * max Q(s_{t+1}, a)
             with torch.no_grad():
@@ -161,45 +154,11 @@ class DeepQnetwork:
                 obs = s_
         return res.mean(), res.std()
 
+    def load_and_save_weight(self, path, mode='load'):
+        if mode == 'load':
+            if os.path.exists(path):
+                self.QNet.load_state_dict(torch.load(path))
+                self.QNet_target.load_state_dict(torch.load(path))
 
-
-
-def demo_test():
-    import time
-    import gym
-    from copy import deepcopy
-    torch.manual_seed(0)
-    env_id = 'CartPole-v0'
-    env = gym.make(env_id)
-    obs_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.n
-    agent = DeepQnetwork(obs_dim, action_dim)
-    # using random explore to collect samples.
-    agent.explore_env(deepcopy(env), all_greedy=True)
-    total_step = 100000
-    eval_env = deepcopy(env)
-    step = 0
-    target_return = 200
-    avg_return = 0
-    t = time.time()
-    step_record = []
-    episode_return_mean = []
-    episode_return_std = []
-    while step < total_step and  avg_return < target_return-1:
-        step += agent.explore_env(env)
-        agent.update()
-        avg_return, std_return = agent.evaluate(eval_env)
-        print(f'current step:{step}, reward:{avg_return}')
-        episode_return_mean.append(avg_return)
-        episode_return_std.append(std_return)
-        step_record.append(step)
-    #agent.QNet.load_and_save_weight(f'LunarLanderDQN.weight', mode='save')
-    t = time.time() - t
-    print('total cost time:',t,'s')
-    from utils import plot_learning_curve
-    plot_learning_curve(step_record, episode_return_mean, episode_return_std)
-    # agent.evaluate(eval_env, render=True)
-
-
-if __name__ == '__main__':
-    demo_test()
+        else:
+            torch.save(self.QNet.state_dict(), path)

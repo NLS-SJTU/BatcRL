@@ -1,19 +1,18 @@
 '''
 implemented by PyTorch.
 '''
-import gym
 import numpy as np
 import torch.nn as nn
 import torch
-from torch.optim import RMSprop
+from torch.optim import Adam
 from typing import Tuple
 import os
 
 
 class ReplayBuffer:
-    def __init__(self, state_dim:list, max_size=10000, device=torch.device('cpu')):
+    def __init__(self, state_dim, max_size=10000, device=torch.device('cpu')):
         self.device = device
-        self.state_buffer = torch.empty((max_size, *state_dim), dtype=torch.float32, device=device)
+        self.state_buffer = torch.empty((max_size, state_dim), dtype=torch.float32, device=device)
         self.other_buffer = torch.empty((max_size, 3), dtype=torch.float32, device=device)
         self.index = 0
         self.max_size = max_size
@@ -38,47 +37,64 @@ class ReplayBuffer:
 
 
 class QNet(nn.Module):
-    def __init__(self, img_dim: list, action_dim: int, mid_dim: int = 512) -> None:
+    def __init__(self, obs_dim: int, action_dim: int, mid_dim: int = 512) -> None:
         '''
-        :param img_dim: (size, size, channel). e.g: 28 * 28 * 3
-        :param action_dim: the number of actions.
-        :param mid_dim: mlp dim.
+        :param obs_dim:  the dim of observation. type: int. for gym env: obs_dim = env.observation_space.shape[0]
+        :param action_dim: action space, i.e: The number of actions that can be taken at each step. type:int. for gym env: action_dim = env.action_space.n
+        :param mid_dim: hidden size of MLP.
         '''
         super(QNet, self).__init__()
-        channel, size, _ = img_dim
+        self.obs_dim = obs_dim
         self.action_dim = action_dim
-        cnn = nn.Sequential(
-            nn.Conv2d(channel, 32, kernel_size=8, stride=4), nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=4, stride=2), nn.ReLU(),
-            nn.Conv2d(64, 64, kernel_size=3, stride=1), nn.ReLU(),
-            nn.Flatten(),
+        self.encoder = nn.Sequential(
+            nn.Linear(obs_dim, mid_dim), nn.ReLU(),
+            nn.Linear(mid_dim, mid_dim), nn.ReLU(),
         )
-        with torch.no_grad():
-            tmp = torch.rand((1, channel, size, size))
-            tmp_dim = cnn(tmp).shape[1]
-        mlp = nn.Sequential(
-            nn.Linear(tmp_dim, mid_dim), nn.ReLU(),
+        self.net_val1 =nn.Sequential(
+            nn.Linear(mid_dim, mid_dim), nn.ReLU(),
+            nn.Linear(mid_dim, 1)
+        )
+        self.net_adv1 = nn.Sequential(
+            nn.Linear(mid_dim, mid_dim), nn.ReLU(),
             nn.Linear(mid_dim, action_dim)
         )
-        self.encoder = nn.Sequential(cnn, mlp)
+
+        self.net_val2 = nn.Sequential(
+            nn.Linear(mid_dim, mid_dim), nn.ReLU(),
+            nn.Linear(mid_dim, 1)
+        )
+        self.net_adv2 = nn.Sequential(
+            nn.Linear(mid_dim, mid_dim), nn.ReLU(),
+            nn.Linear(mid_dim, action_dim)
+        )
+
+        self.q2 = nn.Linear(mid_dim, action_dim)
 
     def forward(self, state: torch.FloatTensor) -> torch.FloatTensor:
         # return Q(s, a). the estimated state-action value.
-        return self.encoder(state)
+        state = self.encoder(state)
+        q_val = self.net_val1(state)
+        q_adv = self.net_adv1(state)
 
-    def load_and_save_weight(self, path, mode='load'):
-        if mode == 'load':
-            if os.path.exists(path):
-                self.load_state_dict(torch.load(path))
-        else:
-            torch.save(self.state_dict(), path)
+        return q_val + q_adv - q_adv.mean(dim=1, keepdim=True)
+
+    def get_q1_q2(self, state: torch.FloatTensor) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
+        state = self.encoder(state)
+        q_val1 = self.net_val1(state)
+        q_adv1 = self.net_adv1(state)
+        q1 = q_val1 + q_adv1 - q_adv1.mean(dim=1, keepdim=True)
+
+        q_val2 = self.net_val2(state)
+        q_adv2 = self.net_adv2(state)
+        q2 = q_val2 + q_adv2 - q_adv2.mean(dim=1, keepdim=True)
+        return q1, q2
 
 
-class DQNAgent:
-    def __init__(self, obs_dim: list, action_dim: int):
+class D3QNAgent:
+    def __init__(self, obs_dim: int, action_dim: int):
         self.obs_dim = obs_dim
         self.action_dim = action_dim
-        self.learning_tate = 0.00025
+        self.learning_tate = 1e-4
         self.tau = 2 ** -8  # soft update.
         self.gamma = 0.99  # discount factor.
         self.batch_size = 128
@@ -88,14 +104,14 @@ class DQNAgent:
         for exploring in the env, each time will collect self.target_step * self.batch_size number of samples into buffer,
         for updating neural network, each time will update self.target_step * self.repeat_time times. 
         '''
-        self.target_step = 1024
+        self.target_step = 2048
         self.repeat_time = 2
         self.reward_scale = 1.
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.buffer = ReplayBuffer(obs_dim, self.memory_size, self.device)
         self.QNet = QNet(obs_dim, action_dim).to(self.device)
         self.QNet_target = QNet(obs_dim, action_dim).to(self.device)  # Q target.
-        self.optimizer = RMSprop(self.QNet.parameters(), self.learning_tate,alpha=0.95, eps=0.01)
+        self.optimizer = Adam(self.QNet.parameters(), self.learning_tate)
         self.loss_func = nn.MSELoss(reduction='mean')
 
     def select_action(self, state: np.ndarray) -> int:
@@ -130,17 +146,22 @@ class DQNAgent:
         for _ in range(int(self.target_step * self.repeat_time / self.batch_size)):
             state, action, reward, mask, state_ = self.buffer.sample_batch(self.batch_size)
             # Q(s_t, a_t) = r_t + \gamma * max Q(s_{t+1}, a)
-            next_q = self.QNet_target(state_).detach().max(1)[0]
+            with torch.no_grad():
+                q1, q2 = self.QNet_target.get_q1_q2(state_)
+                next_q = torch.min(q1, q2).max(1)[0]
             q_target = reward + mask * next_q
-            q_eval = self.QNet(state).gather(1, action)
-            loss = self.loss_func(q_eval, q_target.view(self.batch_size, 1))
+            q_target = q_target.view(self.batch_size, 1)
+            q1_eval, q2_eval = self.QNet.get_q1_q2(state)
+            q1_eval = q1_eval.gather(1, action)
+            q2_eval = q2_eval.gather(1, action)
+            loss = self.loss_func(q1_eval, q_target) + self.loss_func(q2_eval, q_target)
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
             self.soft_update(self.QNet, self.QNet_target, self.tau)
 
     def evaluate(self, env, render=False):
-        epochs = 20
+        epochs = 50
         res = np.zeros((epochs,))
         obs = env.reset()
         index = 0
@@ -158,55 +179,11 @@ class DQNAgent:
                 obs = s_
         return res.mean(), res.std()
 
+    def load_and_save_weight(self, path, mode='load'):
+        if mode == 'load':
+            if os.path.exists(path):
+                self.QNet.load_state_dict(torch.load(path))
+                self.QNet_target.load_state_dict(torch.load(path))
 
-class RewardClip(gym.RewardWrapper):
-    def reward(self, reward):
-        return np.clip(reward, -1.0, 1.0)
-
-
-def demo_test():
-    import time
-    from copy import deepcopy
-    from AtrariEnv import make_env
-    torch.manual_seed(0)
-    env_id = 'Breakout-v0' # 'CartPole-v0'
-    env = make_env(env_id)
-    env = RewardClip(env)
-    obs_dim = env.observation_space.shape
-    action_dim = env.action_space.n
-    agent = DQNAgent(obs_dim, action_dim)
-    # using random explore to collect samples.
-    agent.explore_env(deepcopy(env), all_greedy=True)
-    total_step = 50000000
-    eval_env = deepcopy(env)
-    step = 0
-    target_return = 300
-    avg_return = 0
-    t = time.time()
-    step_record = []
-    episode_return_mean = []
-    episode_return_std = []
-    init_save = 100000
-    from utils import plot_learning_curve
-    while step < total_step and avg_return < target_return - 1:
-        step += agent.explore_env(env)
-        agent.update()
-        avg_return, std_return = agent.evaluate(eval_env)
-        print(f'current step:{step}, episode return:{avg_return}')
-        episode_return_mean.append(avg_return)
-        episode_return_std.append(std_return)
-        step_record.append(step)
-        plot_learning_curve(step_record, episode_return_mean, episode_return_std, 'breakOut_fix_plot_learning_curve.jpg')
-        if step > init_save:
-            agent.QNet.load_and_save_weight(f'BreakoutDQN.weight', mode='save')
-            init_save += init_save
-
-    agent.QNet.load_and_save_weight(f'BreakoutDQN.weight', mode='save')
-    t = time.time() - t
-    print('total cost time:', t, 's')
-    plot_learning_curve(step_record, episode_return_mean, episode_return_std,'breakOut_fix_plot_learning_curve.jpg')
-    # agent.evaluate(eval_env, render=True)
-
-
-if __name__ == '__main__':
-    demo_test()
+        else:
+            torch.save(self.QNet.state_dict(), path)

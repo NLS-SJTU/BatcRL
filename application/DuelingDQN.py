@@ -64,22 +64,15 @@ class DuelingQNet(nn.Module):
         q_adv = self.net_adv(state)
         return q_val + q_adv - q_adv.mean(dim=1, keepdim=True)
 
-    def load_and_save_weight(self, path, mode='load'):
-        if mode == 'load':
-            if os.path.exists(path):
-                self.load_state_dict(torch.load(path))
-        else:
-            torch.save(self.state_dict(), path)
 
-
-class DeepDuelingQNetwork:
+class DuelingDQNAgent:
     def __init__(self, obs_dim: int, action_dim: int):
         self.obs_dim = obs_dim
         self.action_dim = action_dim
         self.learning_tate = 1e-4
         self.tau = 2 ** -8  # soft update.
         self.gamma = 0.99  # discount factor.
-        self.batch_size = 256
+        self.batch_size = 128
         self.memory_size = 100000
         self.explore_rate = 0.2  # epsilon greedy rate.
         '''
@@ -87,7 +80,7 @@ class DeepDuelingQNetwork:
         for updating neural network, each time will update self.target_step * self.repeat_time times. 
         '''
         self.target_step = 1024
-        self.repeat_time = 1
+        self.repeat_time = 2
         self.reward_scale = 1.
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.buffer = ReplayBuffer(obs_dim, self.memory_size, self.device)
@@ -125,7 +118,7 @@ class DeepDuelingQNetwork:
 
     def update(self) -> None:
         # update the neural network.
-        for _ in range(self.target_step * self.repeat_time):
+        for _ in range(int(self.target_step * self.repeat_time / self.batch_size)):
             state, action, reward, mask, state_ = self.buffer.sample_batch(self.batch_size)
             # Q(s_t, a_t) = r_t + \gamma * max Q(s_{t+1}, a)
             next_q = self.DuelingQNet_target(state_).detach().max(1)[0]
@@ -156,51 +149,10 @@ class DeepDuelingQNetwork:
                 obs = s_
         return res.mean(), res.std()
 
-def demo_test():
-    import time
-    import gym
-    import highway_env
-    from copy import deepcopy
-    from utils import plot_learning_curve
-
-
-    torch.manual_seed(0)
-    env_id = 'roundabout-v0' # 'CartPole-v0'
-    env = gym.make(env_id)
-    env = gym.wrappers.FlattenObservation(env)
-    obs_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.n
-    print(f'env name:{env_id}, obs dim:{obs_dim}, action dim:{action_dim}')
-    agent = DeepDuelingQNetwork(obs_dim, action_dim)
-    # using random explore to collect samples.
-    agent.explore_env(deepcopy(env), all_greedy=True)
-    total_step = 1000000
-    eval_env = deepcopy(env)
-    step = 0
-    target_return = 10
-    avg_return = 0
-    t = time.time()
-    step_record = []
-    episode_return_mean = []
-    episode_return_std = []
-    init_save = 10000
-    while step < total_step and avg_return < target_return - 1:
-        step += agent.explore_env(env)
-        agent.update()
-        avg_return, std_return = agent.evaluate(eval_env)
-        print(f'current step:{step}, episode return:{avg_return}')
-        episode_return_mean.append(avg_return)
-        episode_return_std.append(std_return)
-        step_record.append(step)
-        plot_learning_curve(step_record, episode_return_mean, episode_return_std, 'highway_plot_learning_curve.jpg')
-        if step > init_save:
-            agent.DuelingQNet.load_and_save_weight(f'HighwayDQN.weight', mode='save')
-            init_save += init_save
-    agent.DuelingQNet.load_and_save_weight(f'HighwayDQN.weight', mode='save')
-    t = time.time() - t
-    print('total cost time:', t, 's')
-    plot_learning_curve(step_record, episode_return_mean, episode_return_std)
-    agent.evaluate(eval_env, render=True)
-
-if __name__ == '__main__':
-    demo_test()
+    def load_and_save_weight(self, path, mode='load'):
+        if mode == 'load':
+            if os.path.exists(path):
+                self.DuelingQNet.load_state_dict(torch.load(path))
+                self.DuelingQNet_target.load_state_dict(torch.load(path))
+        else:
+            torch.save(self.DuelingQNet.state_dict(), path)
