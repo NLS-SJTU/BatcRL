@@ -148,10 +148,12 @@ class DQNAgent:
             if render: env.render()
             obs = torch.as_tensor((obs,), dtype=torch.float32, device=self.device).detach_()
             dist = self.QNet(obs)[0]
-            action = dist.argmax(dim=0).cpu().numpy()
+            action = int(dist.argmax(dim=0).cpu().numpy())
+            print(action)
             s_, reward, done, _ = env.step(action)
             res[index] += reward
             if done:
+                print('done')
                 index += 1
                 obs = env.reset()
             else:
@@ -159,28 +161,27 @@ class DQNAgent:
         return res.mean(), res.std()
 
 
-class RewardClip(gym.RewardWrapper):
-    def reward(self, reward):
-        return np.clip(reward, -1.0, 1.0)
+
 
 
 def demo_test():
     import time
     from copy import deepcopy
     from AtrariEnv import make_env
-    torch.manual_seed(0)
-    env_id = 'Breakout-v0' # 'CartPole-v0'
+    torch.manual_seed(100)
+    env_id = 'CarRacing-v0' # 'CartPole-v0'
     env = make_env(env_id)
-    env = RewardClip(env)
     obs_dim = env.observation_space.shape
     action_dim = env.action_space.n
     agent = DQNAgent(obs_dim, action_dim)
+    agent_name = agent.__class__.__name__
+
     # using random explore to collect samples.
     agent.explore_env(deepcopy(env), all_greedy=True)
-    total_step = 50000000
+    total_step = 10000000
     eval_env = deepcopy(env)
     step = 0
-    target_return = 300
+    target_return = 350
     avg_return = 0
     t = time.time()
     step_record = []
@@ -196,16 +197,16 @@ def demo_test():
         episode_return_mean.append(avg_return)
         episode_return_std.append(std_return)
         step_record.append(step)
-        plot_learning_curve(step_record, episode_return_mean, episode_return_std, 'breakOut_fix_plot_learning_curve.jpg')
+        plot_learning_curve(step_record, episode_return_mean, episode_return_std, f'{env_id}_{agent_name}_plot_learning_curve.jpg')
         if step > init_save:
-            agent.QNet.load_and_save_weight(f'BreakoutDQN.weight', mode='save')
+            agent.QNet.load_and_save_weight(f'{env_id}_{agent_name}.weight', mode='save')
             init_save += init_save
 
-    agent.QNet.load_and_save_weight(f'BreakoutDQN.weight', mode='save')
+    agent.QNet.load_and_save_weight(f'{env_id}_{agent_name}.weight', mode='load')
     t = time.time() - t
     print('total cost time:', t, 's')
-    plot_learning_curve(step_record, episode_return_mean, episode_return_std,'breakOut_fix_plot_learning_curve.jpg')
-    # agent.evaluate(eval_env, render=True)
+    plot_learning_curve(step_record, episode_return_mean, episode_return_std,f'{env_id}_{agent_name}_plot_learning_curve.jpg')
+    agent.evaluate(env, render=True)
 
 
 if __name__ == '__main__':

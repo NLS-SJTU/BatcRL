@@ -113,15 +113,24 @@ class ScaledFloatFrame(gym.ObservationWrapper):
 def make_env(env_name):
     env = gym.make(env_name)
     env = MaxAndSkipEnv(env)
-    env = FireResetEnv(env)
+    # env = FireResetEnv(env)
     env = ProcessFrame84(env)
     env = ImageToPyTorch(env)
     env = BufferWrapper(env, 4)
     return ScaledFloatFrame(env)
 
+class RewardClip(gym.RewardWrapper):
+    def reward(self, reward):
+        return np.clip(reward, -1.0, 1.0)
 
 if __name__ == '__main__':
     env_id = 'Breakout-v0'
     env = make_env(env_id)
+    env = RewardClip(env)
     obs = env.reset()
-    print(obs.shape)
+    while True:
+        env.render()
+        action = env.action_space.sample()
+        obs_, reward, done, _ = env.step(3)
+        if done:
+            env.reset()

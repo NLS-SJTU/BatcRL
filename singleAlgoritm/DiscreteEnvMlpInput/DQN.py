@@ -12,6 +12,7 @@ class ReplayBuffer:
     def __init__(self, state_dim, max_size=10000, device=torch.device('cpu')):
         self.device = device
         self.state_buffer = torch.empty((max_size, state_dim), dtype=torch.float32, device=device)
+        # r_t, done, a_t
         self.other_buffer = torch.empty((max_size, 3), dtype=torch.float32, device=device)
         self.index = 0
         self.max_size = max_size
@@ -28,7 +29,7 @@ class ReplayBuffer:
         indices = np.random.randint(0, self.total_len - 1, batch_size)
         return (
             self.state_buffer[indices],  # S_t
-            self.other_buffer[indices, 2:].long(),  # a_t
+            self.other_buffer[indices, 2].long(),  # a_t
             self.other_buffer[indices, 0],  # r_t
             self.other_buffer[indices, 1],  # done
             self.state_buffer[indices + 1]
