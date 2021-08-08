@@ -1,7 +1,7 @@
 from DQN import DQNAgent
 from D3QN import D3QNAgent
 from PPO import PPODiscreteAgent
-from utils import plot_learning_curve
+from utils import plot_learning_curve, record_video
 import gym
 import time
 from copy import  deepcopy
@@ -33,11 +33,13 @@ def demo_test():
         episode_return_std.append(std_return)
         step_record.append(step)
         plot_learning_curve(step_record, episode_return_mean, episode_return_std,f'{env_id}_{agent_name}.png')
-    agent.load_and_save_weight(f'{env_id}_{agent_name}', mode='save')
+    agent.load_and_save_weight(f'{env_id}_{agent_name}', mode='load')
     t = time.time() - t
     print('total cost time:', t, 's')
-    plot_learning_curve(step_record, episode_return_mean, episode_return_std, f'{env_id}_{agent_name}.png')
-    agent.evaluate(eval_env, render=True)
+    # plot_learning_curve(step_record, episode_return_mean, episode_return_std, f'{env_id}_{agent_name}.png')
+    # agent.evaluate(eval_env, render=True)
+    record_video(agent, env, env_id, device=torch.device('cuda'))
+
 
 
 

@@ -105,7 +105,7 @@ class D3QNAgent:
         for updating neural network, each time will update self.target_step * self.repeat_time times. 
         '''
         self.target_step = 2048
-        self.repeat_time = 2
+        self.repeat_time = 32
         self.reward_scale = 1.
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.buffer = ReplayBuffer(obs_dim, self.memory_size, self.device)

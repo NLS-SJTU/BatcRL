@@ -1,5 +1,10 @@
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
+import os
+import imageio
+import torch
 
 
 def plot_learning_curve(steps, avg_return, std_return, name='plot_learning_curve.jpg'):
@@ -13,21 +18,26 @@ def plot_learning_curve(steps, avg_return, std_return, name='plot_learning_curve
     plt.close()
 
 
-def record_video(env_id, agent):
-    import gym
-    from gym.wrappers import Monitor
-    import torch
-    import highway_env
-    env = Monitor(gym.make(env_id), './video', force=True)
-    obs = env.reset()
-    eps = 10
+def record_video(agent, env, save_dir,device=torch.device('cpu')):
+    epochs = 5
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
     index = 0
-    while index < eps:
-        action = agent(torch.as_tensor(obs, dtype=torch.float32, device=torch.device('cuda')))
-        state_, reward, done, _ = env.step(action)
-        if done:
+    images = []
+    for _ in range(epochs):
+        obs = env.reset()
+        done = False
+        while not done:
+            img = env.render(mode='rgb_array')
+            images.append(img)
             index += 1
-    env.close()
+            action = agent.select_action(obs)
+            obs_, reward, done, _ = env.step(action)
+            obs = obs_
+            if done:
+                break
+    imageio.mimsave(f'{save_dir}.gif', images, fps=30)
+
 
 
 
