@@ -129,7 +129,7 @@ class D3QNAgent:
         state = env.reset()
         for _ in range(self.target_step):
             action = np.random.randint(self.action_dim) if all_greedy else self.select_action(state)
-            state_, reward, done, _ = env.step(action)
+            state_, reward, done, _ = env.step(int(action))
             other = (reward * self.reward_scale, 0.0 if done else self.gamma, action)
             self.buffer.append(state, other)
             state = env.reset() if done else state_

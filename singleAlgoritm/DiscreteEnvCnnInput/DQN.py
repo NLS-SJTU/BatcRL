@@ -169,7 +169,7 @@ def demo_test():
     from copy import deepcopy
     from AtrariEnv import make_env
     torch.manual_seed(100)
-    env_id = 'CarRacing-v0' # 'CartPole-v0'
+    env_id = '' # 'CartPole-v0'
     env = make_env(env_id)
     obs_dim = env.observation_space.shape
     action_dim = env.action_space.n

@@ -5,6 +5,15 @@ import numpy as np
 import os
 import imageio
 import torch
+import gym
+
+class FlattenObs(gym.ObservationWrapper):
+    def __init__(self, env):
+        super(FlattenObs, self).__init__(env)
+        w, h = env.observation_space.shape
+        env.observation_space.shape = (w * h, )
+    def observation(self, observation):
+        return observation.ravel()
 
 
 def plot_learning_curve(steps, avg_return, std_return, name='plot_learning_curve.jpg'):
@@ -41,3 +50,9 @@ def record_video(agent, env, save_dir,device=torch.device('cpu')):
 
 
 
+if __name__ == "__main__":
+    import highway_env
+    env =gym.make('highway-v0')
+    env = FlattenObs(env)
+    print(env.reset().shape)
+    print(env.observation_space)

@@ -1,29 +1,34 @@
 from DQN import DQNAgent
 from D3QN import D3QNAgent
 from PPO import PPODiscreteAgent
-from utils import plot_learning_curve, record_video
+from utils import plot_learning_curve, record_video,FlattenObs
 import gym
 import time
 from copy import  deepcopy
-
+import highway_env
+import torch
 def demo_test():
-    env_id = 'LunarLander-v2' # 'CartPole-v0'
+    env_id = 'highway-v0' # 'CartPole-v0'
     env = gym.make(env_id)
+    env = FlattenObs(env)
     obs_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
-    agent = PPODiscreteAgent(obs_dim, action_dim)
+    agent = D3QNAgent(obs_dim, action_dim)
     agent_name = agent.__class__.__name__
     # using random explore to collect samples.
     total_step = 1e7
     eval_env = deepcopy(env)
     step = 0
     target_return = env.spec.reward_threshold
+    if target_return is None:
+        target_return = 100
     avg_return = 0
     t = time.time()
     step_record = []
     episode_return_mean = []
     episode_return_std = []
     print(f'env:{env_id}, obs dim:{obs_dim}, action dim:{action_dim}, target_return:{target_return}')
+    step += agent.explore_env(env, all_greedy=True)
     while step < total_step and avg_return < target_return - 1:
         step += agent.explore_env(env)
         agent.update()
