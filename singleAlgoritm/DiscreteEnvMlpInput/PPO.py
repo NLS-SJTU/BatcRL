@@ -76,17 +76,17 @@ class PPODiscreteAgent:
     def __init__(self, state_dim:int, action_dim:int):
         self.state_dim = state_dim
         self.action_dim = action_dim
-        self.mid_dim = 512
-        self.actor_lr = 2e-3
-        self.critic_lr = 1e-3
+        self.mid_dim = 256
+        self.actor_lr = 2e-4
+        self.critic_lr = 1e-4
         self.entropy_coef= 0.02
         self.max_buffer_size= 10000
-        self.batch_size = 512
+        self.batch_size = 32
         self.clip_epsilon = 0.2
         self.target_step = 2048
         self.repeat_time = 4
         self.reward_scale = 1.
-        self.tau = 2 ** -8  # soft update.
+        self.tau = 2 ** -9  # soft update.
         self.gamma = 0.98  # discount factor.
 
         self.net_device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
