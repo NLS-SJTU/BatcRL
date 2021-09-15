@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import numpy as np
 import os
-from copy import deepcopy
 
 class ReplayBuffer:
     def __init__(self, state_dim:int, max_size:int=10000, device=torch.device('cpu')):
@@ -12,27 +11,24 @@ class ReplayBuffer:
         # r_t, done,a_t, action_log
         self.other_buffer = torch.empty((max_size, 4), dtype=torch.float32, device=device)
         self.index = 0
-        self.total_len = 0
 
-    def append(self,state, other):
+    def append(self, state, other):
         self.index = self.index % self.max_size
-        self.total_len = max(self.index, self.max_size)
         self.state_buffer[self.index] = torch.as_tensor(state, dtype=torch.float32, device=self.device)
         self.other_buffer[self.index] = torch.as_tensor(other, dtype=torch.float32, device=self.device)
         self.index += 1
 
     def sample_all(self, device):
         return (
-            torch.as_tensor(self.state_buffer, device=device), # s_t
-            torch.as_tensor(self.other_buffer[:, 2], dtype=torch.long, device=device), # a_t
-            torch.as_tensor(self.other_buffer[:, 0], device=device), # r_t
-            torch.as_tensor(self.other_buffer[:, 1], device=device), # done
-            torch.as_tensor(self.other_buffer[:, 3],device=device), # log_prob
+            torch.as_tensor(self.state_buffer[:self.index], device=device), # s_t
+            torch.as_tensor(self.other_buffer[:self.index, 2], dtype=torch.long, device=device), # a_t
+            torch.as_tensor(self.other_buffer[:self.index, 0], device=device), # r_t
+            torch.as_tensor(self.other_buffer[:self.index, 1], device=device), # done
+            torch.as_tensor(self.other_buffer[:self.index, 3],device=device), # log_prob
         )
 
     def empty_buffer(self):
         self.index = 0
-        self.total_len = 0
 
 
 class ActorPPO(nn.Module):
@@ -85,13 +81,13 @@ class PPODiscreteAgent:
         self.critic_lr = 1e-3
         self.entropy_coef= 0.02
         self.max_buffer_size= 10000
-        self.batch_size = 128
+        self.batch_size = 512
         self.clip_epsilon = 0.2
-        self.target_step = 1024
-        self.repeat_time = 32
+        self.target_step = 2048
+        self.repeat_time = 4
         self.reward_scale = 1.
         self.tau = 2 ** -8  # soft update.
-        self.gamma = 0.99  # discount factor.
+        self.gamma = 0.98  # discount factor.
 
         self.net_device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.buffer_device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

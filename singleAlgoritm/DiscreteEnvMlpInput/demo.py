@@ -1,19 +1,17 @@
 from DQN import DQNAgent
 from D3QN import D3QNAgent
 from PPO import PPODiscreteAgent
-from utils import plot_learning_curve, record_video,FlattenObs
+from utils import plot_learning_curve, record_video
 import gym
 import time
 from copy import  deepcopy
-import highway_env
 import torch
 def demo_test():
-    env_id = 'highway-v0' # 'CartPole-v0'
+    env_id = 'LunarLander-v2' # 'CartPole-v0'
     env = gym.make(env_id)
-    env = FlattenObs(env)
     obs_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
-    agent = D3QNAgent(obs_dim, action_dim)
+    agent = PPODiscreteAgent(obs_dim, action_dim)
     agent_name = agent.__class__.__name__
     # using random explore to collect samples.
     total_step = 1e7
@@ -28,12 +26,14 @@ def demo_test():
     episode_return_mean = []
     episode_return_std = []
     print(f'env:{env_id}, obs dim:{obs_dim}, action dim:{action_dim}, target_return:{target_return}')
-    step += agent.explore_env(env, all_greedy=True)
+    step += agent.explore_env(env)
+    max_return = -10 ** 4
     while step < total_step and avg_return < target_return - 1:
         step += agent.explore_env(env)
         agent.update()
         avg_return, std_return = agent.evaluate(eval_env)
-        print(f'current step:{step}, episode return:{avg_return}')
+        if avg_return > max_return: max_return = avg_return
+        print(f'current step:{step}, max return:{max_return}, episode return:{avg_return}')
         episode_return_mean.append(avg_return)
         episode_return_std.append(std_return)
         step_record.append(step)
