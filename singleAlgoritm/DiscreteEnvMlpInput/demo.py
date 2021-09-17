@@ -7,7 +7,7 @@ import time
 from copy import  deepcopy
 import torch
 def demo_test():
-    env_id = 'LunarLander-v2' # 'CartPole-v0'
+    env_id = 'CartPole-v0' # 'CartPole-v0'
     env = gym.make(env_id)
     obs_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
