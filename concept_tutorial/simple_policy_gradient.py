@@ -49,11 +49,11 @@ class Buffer:
 
 class PolicyGradient:
     def __init__(self, state_dim, action_dim):
-        learning_rate = 2e-4
+        learning_rate = 1e-4
         self.actor = ActorNet(state_dim, action_dim)
         self.policy_optimizer = torch.optim.Adam(self.actor.parameters(), lr=learning_rate)
 
-        self.discount_factor = 0.98
+        self.discount_factor = 0.97
         self.buffer = Buffer()
         self.mse_loss = nn.MSELoss()
 
@@ -98,8 +98,9 @@ def train_cartpole():
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
     agent = PolicyGradient(state_dim, action_dim)
-    epochs = 6000
+    epochs = 10000
     return_list = []
+    scale = 0.01
     for i in range(epochs):
         obs = env.reset()
         episode_return = 0
@@ -107,7 +108,7 @@ def train_cartpole():
             action = agent.select_action(obs)
             obs_, reward, done, _ = env.step(action)
             episode_return +=reward
-            agent.add_data(obs, action, reward, done)
+            agent.add_data(obs, action, reward * scale, done)
             if done:
                 actor_loss = agent.update_network()
                 return_list.append(episode_return)
