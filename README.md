@@ -8,6 +8,32 @@ BATC Reinforcement Learning Library
 * numpy
 * matplotlib
 
+# Implemented Algorithm
+
+* DQN
+  * CNN Input
+  * MLP Input
+* Double DQN
+  * CNN Input
+  * MLP Input
+* Dueling DQN
+  * CNN Input
+  * MLP Input
+* D3QN
+  * CNN Input
+  * MLP Input
+* PPO
+  * MLP Input
+    * Discrete Action Space
+    * Continuous Action Space
+  
+* DDPG
+  * MLP Input
+    * Continuous Action Space
+  
+
+
+
 # Experiments in Gym
 
 ## Discrete action space control
