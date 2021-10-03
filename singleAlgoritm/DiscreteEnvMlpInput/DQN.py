@@ -29,7 +29,7 @@ class ReplayBuffer:
         indices = np.random.randint(0, self.total_len - 1, batch_size)
         return (
             self.state_buffer[indices],  # S_t
-            self.other_buffer[indices, 2].long(),  # a_t
+            self.other_buffer[indices, 2:].long(),  # a_t
             self.other_buffer[indices, 0],  # r_t
             self.other_buffer[indices, 1],  # done
             self.state_buffer[indices + 1]
@@ -65,15 +65,15 @@ class DQNAgent:
         self.learning_tate = 1e-4
         self.tau = 2 ** -8  # soft update.
         self.gamma = 0.99  # discount factor.
-        self.batch_size = 128
-        self.memory_size = 200000
+        self.batch_size = 512
+        self.memory_size = 2000000
         self.explore_rate = 0.2  # epsilon greedy rate.
         '''
         for exploring in the env, each time will collect self.target_step * self.batch_size number of samples into buffer,
         for updating neural network, each time will update self.target_step * self.repeat_time times. 
         '''
         self.target_step = 4096
-        self.repeat_time = 32
+        self.repeat_time = 128
         self.reward_scale = 1.
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.buffer = ReplayBuffer(obs_dim, self.memory_size, self.device)

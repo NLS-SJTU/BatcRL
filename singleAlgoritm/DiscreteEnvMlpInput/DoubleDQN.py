@@ -73,7 +73,7 @@ class DoubleDQNAgent:
         self.tau = 2 ** -8  # soft update.
         self.gamma = 0.99  # discount factor.
         self.batch_size = 128
-        self.memory_size = 100000
+        self.memory_size = 1000000
         self.explore_rate = 0.2  # epsilon greedy rate.
         '''
         for exploring in the env, each time will collect self.target_step * self.batch_size number of samples into buffer,

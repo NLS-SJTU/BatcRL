@@ -80,7 +80,7 @@ class PPODiscreteAgent:
         self.actor_lr = 2e-4
         self.critic_lr = 1e-4
         self.entropy_coef= 0.02
-        self.max_buffer_size= 10000
+        self.max_buffer_size= 100000
         self.batch_size = 32
         self.clip_epsilon = 0.2
         self.target_step = 2048

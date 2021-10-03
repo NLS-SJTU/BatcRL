@@ -49,10 +49,10 @@ class DuelingQNet(nn.Module):
             nn.Linear(obs_dim, mid_dim), nn.ReLU(),
             nn.Linear(mid_dim, mid_dim), nn.ReLU(),
         )
-        self.net_val1 = nn.Sequential(
+        self.net_val = nn.Sequential(
             nn.Linear(mid_dim, mid_dim), nn.ReLU(),
             nn.Linear(mid_dim, 1))
-        self.net_adv1 = nn.Sequential(
+        self.net_adv = nn.Sequential(
             nn.Linear(mid_dim, mid_dim), nn.ReLU(),
             nn.Linear(mid_dim, action_dim))
 
@@ -71,15 +71,15 @@ class DuelingDQNAgent:
         self.learning_tate = 1e-4
         self.tau = 2 ** -8  # soft update.
         self.gamma = 0.99  # discount factor.
-        self.batch_size = 64
-        self.memory_size = 100000
+        self.batch_size = 512
+        self.memory_size = 1000000
         self.explore_rate = 0.2  # epsilon greedy rate.
         '''
         for exploring in the env, each time will collect self.target_step * self.batch_size number of samples into buffer,
         for updating neural network, each time will update self.target_step * self.repeat_time times. 
         '''
-        self.target_step = 1024
-        self.repeat_time = 1
+        self.target_step = 4096
+        self.repeat_time = 128
         self.reward_scale = 1.
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.buffer = ReplayBuffer(obs_dim, self.memory_size, self.device)
