@@ -41,7 +41,7 @@ def demo_test():
     while step < total_step and avg_return < target_return - 1:
         step += agent.explore_env(env)
         agent.update()
-        avg_return, std_return = agent.evaluate(eval_env)
+        avg_return, std_return = agent.evaluate(eval_env,render=True)
         if avg_return > max_return: max_return = avg_return
         print(f'current step:{step}, max return:{max_return}, episode return:{avg_return}')
         episode_return_mean.append(avg_return)

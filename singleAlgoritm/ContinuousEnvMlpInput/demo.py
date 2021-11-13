@@ -1,16 +1,17 @@
 from utils import plot_learning_curve, record_video
 from PPO import PPOAgent
 from DDPG import DDPGAgent
+from SAC import SACAgent
 import gym
 import time
 from copy import  deepcopy
 import torch
 def demo_test():
-    env_id = 'MountainCarContinuous-v0'
+    env_id = 'Pendulum-v0'
     env = gym.make(env_id)
     obs_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
-    agent = DDPGAgent(obs_dim, action_dim)
+    agent = SACAgent(obs_dim, action_dim)
     agent_name = agent.__class__.__name__
     # using random explore to collect samples.
     total_step = 1e7
@@ -18,8 +19,8 @@ def demo_test():
     step = 0
     target_return = env.spec.reward_threshold
     if target_return is None:
-        target_return = 100
-    avg_return = 0
+        target_return = -200
+    avg_return = -10**5
     t = time.time()
     step_record = []
     episode_return_mean = []

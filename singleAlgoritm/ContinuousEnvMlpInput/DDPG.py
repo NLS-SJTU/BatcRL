@@ -20,7 +20,7 @@ class ReplayBuffer:
         self.state_buf[self.index] = torch.as_tensor(state, device=self.device)
         self.other_buf[self.index] = torch.as_tensor(other, device=self.device)
         self.index += 1
-        self.total_len = max(self.index, self.total_len)
+        self.total_len = min(max(self.index, self.total_len), self.max_size)
 
     def sample_batch(self, batch_size):
         batch_index = np.random.randint(0, self.total_len-1, batch_size)
@@ -43,8 +43,11 @@ class ActorDDPG(nn.Module):
             nn.Linear(mid_dim, action_dim), nn.Tanh()
         )
 
-    def forward(self, state, noise_std=0):
-        action = self.net(state)
+    def forward(self, state):
+        return self.net(state).tanh()
+
+    def get_actions(self, state, noise_std=0.5):
+        action = self.net(state).tanh()
         noise = (torch.rand_like(action) * noise_std).clamp(-0.5, 0.5)
         return (action + noise).clamp(-1.0, 1.0)
 
@@ -73,7 +76,7 @@ class DDPGAgent:
         self.noise_std = 0.2 # must < 1
         self.mid_dim = 256
         self.target_step = 4096
-        self.repeat_time = 128
+        self.repeat_time = 32
         self.gamma = 0.98
         self.max_memory = int(1e7)
         self.device =torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -99,7 +102,7 @@ class DDPGAgent:
 
     def select_action(self, state:np.ndarray) -> np.ndarray:
         state = torch.as_tensor((state, ), dtype=torch.float32, device=self.device)
-        action = self.actor(state, self.noise_std)
+        action = self.actor.get_actions(state, self.noise_std)
         return action.detach().cpu().numpy()[0]
 
 
