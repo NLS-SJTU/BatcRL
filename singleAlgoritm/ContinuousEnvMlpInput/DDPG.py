@@ -161,3 +161,5 @@ class DDPGAgent:
 
 
 
+# demo
+# Pendulum-v1: 66 minutes

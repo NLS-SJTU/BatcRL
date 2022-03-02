@@ -184,3 +184,6 @@ class TD3Agent:
     def soft_update(q_eval, q_target, tau):
         for q_eval_params, q_target_params in zip(q_eval.parameters(), q_target.parameters()):
             q_target_params.data.copy_(tau * q_eval_params.data + (1 - tau) * q_target_params.data)
+
+# demo
+# Pendulum: 15 minutes
