@@ -77,7 +77,7 @@ class DDPGAgent:
         self.mid_dim = 256
         self.target_step = 4096
         self.repeat_time = 32
-        self.gamma = 0.98
+        self.gamma = 0.99
         self.max_memory = int(1e7)
         self.device =torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.actor = ActorDDPG(state_dim, action_dim, self.mid_dim).to(self.device)

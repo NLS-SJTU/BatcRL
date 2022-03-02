@@ -26,7 +26,7 @@ class ReplayBuffer:
     def sample_batch(self, batch_size):
         self.idx = np.random.randint(0, self.total_len-1, batch_size)
         state = self.state_buf[self.idx]
-        action = self.other_buf[self.idx, 2:].long()
+        action = self.other_buf[self.idx, 2:]
         reward = self.other_buf[self.idx, 0].unsqueeze(1)
         mask = self.other_buf[self.idx, 1].unsqueeze(1)
         next_state = self.state_buf[self.idx + 1]

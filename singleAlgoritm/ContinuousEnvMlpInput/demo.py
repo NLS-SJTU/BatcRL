@@ -7,11 +7,11 @@ import time
 from copy import  deepcopy
 import torch
 def demo_test():
-    env_id = 'Pendulum-v0'
+    env_id = 'Pendulum-v1'
     env = gym.make(env_id)
     obs_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
-    agent = SACAgent(obs_dim, action_dim)
+    agent = DDPGAgent(obs_dim, action_dim)
     agent_name = agent.__class__.__name__
     # using random explore to collect samples.
     total_step = 1e7
