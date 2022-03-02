@@ -23,7 +23,7 @@ class ReplayBuffer:
     def sample_all(self, device):
         return (
             torch.as_tensor(self.state_buffer[:self.index], device=device),  # s_t
-            torch.as_tensor(self.other_buffer[:self.index, 0], dtype=torch.long, device=device),  # r_t
+            torch.as_tensor(self.other_buffer[:self.index, 0], device=device),  # r_t
             torch.as_tensor(self.other_buffer[:self.index, 1], device=device),  # done
             torch.as_tensor(self.other_buffer[:self.index, 2: 2 + self.action_dim], device=device),  # a_t
             torch.as_tensor(self.other_buffer[:self.index, -self.action_dim:], device=device),  # noise

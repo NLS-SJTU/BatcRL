@@ -2,6 +2,7 @@ from utils import plot_learning_curve, record_video
 from PPO import PPOAgent
 from DDPG import DDPGAgent
 from SAC import SACAgent
+from TD3 import TD3Agent
 import gym
 import time
 from copy import  deepcopy
@@ -11,7 +12,7 @@ def demo_test():
     env = gym.make(env_id)
     obs_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
-    agent = DDPGAgent(obs_dim, action_dim)
+    agent = TD3Agent(obs_dim, action_dim)
     agent_name = agent.__class__.__name__
     # using random explore to collect samples.
     total_step = 1e7
