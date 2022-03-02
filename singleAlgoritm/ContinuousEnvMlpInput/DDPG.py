@@ -26,7 +26,7 @@ class ReplayBuffer:
         batch_index = np.random.randint(0, self.total_len-1, batch_size)
         return (
             self.state_buf[batch_index], # s_t
-            self.other_buf[batch_index, 2:].long(),# a_t
+            self.other_buf[batch_index, 2:],# a_t
             self.other_buf[batch_index,0], # reward
             self.other_buf[batch_index,1], # done
             self.state_buf[batch_index+1] # s_{t+1}
@@ -108,7 +108,7 @@ class DDPGAgent:
 
     def update(self) -> None:
         for _ in range(int(self.target_step * self.repeat_time / self.batch_size)):
-            state, action ,reward, mask, state_ = self.buffer.sample_batch(self.batch_size)
+            state, action, reward, mask, state_ = self.buffer.sample_batch(self.batch_size)
             with torch.no_grad():
                 q_target = reward + mask * self.critic(state_, self.actor(state_)).squeeze()
             q_eval = self.critic(state, action).squeeze()

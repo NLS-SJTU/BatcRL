@@ -66,6 +66,7 @@ class ActorSAC(nn.Module):
 
         log_prob = log_std + self.log_sqrt_2pi + noise.pow(2).__mul__(0.5)
         log_prob = log_prob + (1. - action_tanh.pow(2)).log()
+        # here ,log_prob lacks "minus sign"
         return action_tanh, log_prob.sum(1,keepdim=True)
 
 
@@ -129,6 +130,8 @@ class SACAgent:
                 next_action, next_log_prob = self.actor.get_actions_logprob(batch_next_state)
                 next_q = torch.min(*self.critic(batch_next_state, next_action))
                 q_label = batch_reward + batch_mask * (next_q + self.alpha * next_log_prob)
+                # Q(s_t,a_t) = r_{t} + gamma * (Q(s_{t+1}, f(s_{t+1}) - logprob * alpha))
+                # why we use "+", pls see get_actions_logprob func.
 
             # critic optim
             q1, q2 = self.critic(batch_state, batch_action)
@@ -137,7 +140,7 @@ class SACAgent:
 
             # actor optim
             action_pg, log_prob = self.actor.get_actions_logprob(batch_state)
-            actor_obj = -torch.mean(torch.min(*self.critic(batch_state, action_pg))+ self.alpha * log_prob)
+            actor_obj = -torch.mean(torch.min(*self.critic(batch_state, action_pg)) + self.alpha * log_prob)
             self.optim_update(self.actor_optim, actor_obj)
 
 
