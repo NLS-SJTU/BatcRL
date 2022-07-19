@@ -77,17 +77,20 @@ class PPODiscreteAgent:
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.mid_dim = 256
-        self.actor_lr = 2e-4
-        self.critic_lr = 1e-4
+        self.actor_lr = 1e-4
+        self.critic_lr = 2e-4
         self.entropy_coef= 0.02
-        self.max_buffer_size= 100000
-        self.batch_size = 32
+        self.max_buffer_size= 500000
+        self.batch_size = 1024
         self.clip_epsilon = 0.2
-        self.target_step = 2048
-        self.repeat_time = 4
+        self.target_step = 4096
+        self.repeat_time = 3
         self.reward_scale = 1.
         self.tau = 2 ** -9  # soft update.
-        self.gamma = 0.98  # discount factor.
+        self.gamma = 0.99  # discount factor.
+        self.lambda_gae_adv = 0.95  #gae_lambda
+        self.if_use_gae = True
+
 
         self.net_device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.buffer_device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -100,6 +103,7 @@ class PPODiscreteAgent:
         self.last_state = None
         self.mse_loss = nn.MSELoss()
 
+    @torch.no_grad()
     def select_action(self, state):
         state = torch.as_tensor(state, dtype=torch.float32, device=self.net_device)
         action, logprob = self.actor.get_action_and_logprob(state)
@@ -126,18 +130,28 @@ class PPODiscreteAgent:
     def update(self):
         with torch.no_grad():
             states, actions, reward, mask, old_logprob = self.replay_buffer.sample_all(self.net_device)
+            buf_len = len(actions)
+            buf_adv_v = torch.empty(buf_len, dtype=torch.float32, device=self.net_device)  # advantage value
             state_values = self.critic(states)
-            discount_cumulative_rewards = torch.empty(len(actions), dtype=torch.float32, device=self.net_device)
+            values = state_values.squeeze(1)
+            discount_cumulative_rewards = torch.empty(buf_len, dtype=torch.float32, device=self.net_device)
             tmp_last_state = torch.as_tensor((self.last_state,), dtype=torch.float32, device=self.net_device)
             last_value = self.critic(tmp_last_state)
-            for i in range(len(actions)-1, -1, -1):
+            for i in range(buf_len - 1, -1, -1):
                 discount_cumulative_rewards[i] = reward[i] + mask[i] * last_value
                 last_value = discount_cumulative_rewards[i]
-
-            advantage = discount_cumulative_rewards - (mask * state_values.squeeze(1))
-            advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-10)
+            if self.if_use_gae:         #gae
+                pre_adv_v = 0  # advantage value of previous step
+                for i in range(buf_len - 1, -1, -1):  # Notice: mask = (1-done) * gamma
+                    buf_adv_v[i] = reward[i] + mask[i] * pre_adv_v - values[i]
+                    pre_adv_v = values[i] + buf_adv_v[i] * self.lambda_gae_adv
+                advantage = buf_adv_v
+                advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-10)
+            else:        #reward-to-go
+                advantage = discount_cumulative_rewards - (mask * values)
+                advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-10)
         for _ in range(int(self.target_step * self.repeat_time / self.batch_size)):
-            indices = np.random.randint(0, len(actions), self.batch_size)
+            indices = np.random.randint(0, buf_len, self.batch_size)
             batch_state = states[indices]
             batch_action = actions[indices]
             batch_dis_cum_rewards = discount_cumulative_rewards[indices]
@@ -148,7 +162,7 @@ class PPODiscreteAgent:
             surrogate1 = batch_advantage * ratio
             surrogate2 = batch_advantage * ratio.clamp(1 - self.clip_epsilon, 1 + self.clip_epsilon)
             obj_surrogate = -torch.min(surrogate1, surrogate2).mean()
-            actor_loss = obj_surrogate + batch_entropy * self.entropy_coef
+            actor_loss = obj_surrogate - batch_entropy * self.entropy_coef
             self.optim_update(self.actor_optimizer, actor_loss)
             batch_values = self.critic(batch_state).squeeze(1)
             critic_loss = self.mse_loss(batch_values, batch_dis_cum_rewards)
@@ -157,7 +171,7 @@ class PPODiscreteAgent:
 
 
     def evaluate(self, env, render=False):
-        epochs = 20
+        epochs = 10
         res = np.zeros((epochs,))
         obs = env.reset()
         index = 0
