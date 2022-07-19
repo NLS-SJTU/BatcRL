@@ -131,7 +131,6 @@ class PPODiscreteAgent:
         with torch.no_grad():
             states, actions, reward, mask, old_logprob = self.replay_buffer.sample_all(self.net_device)
             buf_len = len(actions)
-            buf_adv_v = torch.empty(buf_len, dtype=torch.float32, device=self.net_device)  # advantage value
             state_values = self.critic(states)
             values = state_values.squeeze(1)
             discount_cumulative_rewards = torch.empty(buf_len, dtype=torch.float32, device=self.net_device)
@@ -141,12 +140,7 @@ class PPODiscreteAgent:
                 discount_cumulative_rewards[i] = reward[i] + mask[i] * last_value
                 last_value = discount_cumulative_rewards[i]
             if self.if_use_gae:         #gae
-                pre_adv_v = 0  # advantage value of previous step
-                for i in range(buf_len - 1, -1, -1):  # Notice: mask = (1-done) * gamma
-                    buf_adv_v[i] = reward[i] + mask[i] * pre_adv_v - values[i]
-                    pre_adv_v = values[i] + buf_adv_v[i] * self.lambda_gae_adv
-                advantage = buf_adv_v
-                advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-10)
+                advantage = self.advantage_estimator(reward, mask, values, buf_len)
             else:        #reward-to-go
                 advantage = discount_cumulative_rewards - (mask * values)
                 advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-10)
@@ -169,6 +163,15 @@ class PPODiscreteAgent:
             self.optim_update(self.critic_optimizer, critic_loss)
         self.replay_buffer.empty_buffer()
 
+    def advantage_estimator(self, reward, mask, values, buf_len):
+        buf_adv_v = torch.empty(buf_len, dtype=torch.float32, device=self.net_device)  # advantage value
+        pre_adv_v = 0  # advantage value of previous step
+        for i in range(buf_len - 1, -1, -1):  # Notice: mask = (1-done) * gamma
+            buf_adv_v[i] = reward[i] + mask[i] * pre_adv_v - values[i]
+            pre_adv_v = values[i] + buf_adv_v[i] * self.lambda_gae_adv
+        advantage = buf_adv_v
+        advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-10)
+        return advantage
 
     def evaluate(self, env, render=False):
         epochs = 10
